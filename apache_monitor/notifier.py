@@ -2,7 +2,7 @@ import os
 import time
 import json
 import requests
-from queue import Queue
+from queue import Queue, Empty
 from .utils import sanitize_for_telegram
 from .db import log_notification
 import logging
@@ -81,6 +81,7 @@ class Notifier:
         
         while True:
             try:
+                # Timeout adalah kondisi normal jika queue kosong
                 event = self.alert_queue.get(timeout=1)
                 msg = self.format_alert(event)
                 if msg:
@@ -90,6 +91,9 @@ class Notifier:
                 else:
                     logger.warning(f"Tidak dapat memformat alert untuk event: {event.get('type', 'unknown')}")
                 self.alert_queue.task_done()
+            except Empty:
+                # Queue kosong setelah timeout - ini kondisi normal, lanjutkan loop
+                continue
             except Exception as e:
                 logger.error(f"Error memproses alert queue: {e}", exc_info=True)
                 continue
