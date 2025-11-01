@@ -71,11 +71,30 @@ def main():
         telegram_app = start_bot() if start_bot else None
         if telegram_app:
             import threading
+            import time
+            
             def run_telegram_bot():
-                telegram_app.run_polling()
-            tg_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+                try:
+                    logger.info("Starting Telegram bot polling...")
+                    telegram_app.run_polling(
+                        allowed_updates=["message", "callback_query"],
+                        drop_pending_updates=True
+                    )
+                except Exception as e:
+                    logger.error(f"Error in Telegram bot polling: {e}", exc_info=True)
+            
+            tg_thread = threading.Thread(target=run_telegram_bot, daemon=True, name="TelegramBot")
             tg_thread.start()
-            logger.info("Telegram bot listener started for /test_scan")
+            
+            # Beri waktu untuk bot mulai
+            time.sleep(2)
+            
+            if tg_thread.is_alive():
+                logger.info("✅ Telegram bot listener started successfully for /test_scan")
+            else:
+                logger.warning("⚠️ Telegram bot thread tidak berjalan")
+        else:
+            logger.warning("Telegram bot tidak diinisialisasi (token atau chat_id tidak ada)")
 
         # Start monitors dengan error handling terpisah
         log_thread = None
