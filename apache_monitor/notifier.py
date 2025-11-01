@@ -34,41 +34,82 @@ class Notifier:
             return True
 
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {
-            "chat_id": self.chat_id,
-            "text": sanitize_for_telegram(message),
-            "parse_mode": "MarkdownV2"
-        }
-        for attempt in range(3):
+        
+        # Coba dengan berbagai parse mode: MarkdownV2 -> HTML -> Plain text
+        parse_modes = [
+            ("MarkdownV2", lambda msg: sanitize_for_telegram(msg)),
+            ("HTML", lambda msg: self._escape_html(msg)),
+            (None, lambda msg: msg)  # Plain text tanpa formatting
+        ]
+        
+        last_error = None
+        for parse_mode, escape_func in parse_modes:
             try:
+                payload = {
+                    "chat_id": self.chat_id,
+                    "text": escape_func(message)
+                }
+                if parse_mode:
+                    payload["parse_mode"] = parse_mode
+                
                 resp = requests.post(url, json=payload, timeout=10)
-                if resp.status_code == 200:
+                resp_data = resp.json()
+                
+                if resp.status_code == 200 and resp_data.get("ok"):
                     log_notification("telegram", message)
+                    if parse_mode != "MarkdownV2":
+                        logger.info(f"Telegram message sent using {parse_mode or 'plain text'} mode")
                     return True
+                elif resp.status_code == 400 and "can't parse entities" in resp_data.get("description", ""):
+                    # Parse error - coba mode berikutnya
+                    last_error = resp_data.get("description", "Parse error")
+                    logger.debug(f"Parse mode {parse_mode} failed: {last_error}. Trying next mode...")
+                    continue
                 else:
-                    logger.warning(f"Telegram failed: {resp.status_code} {resp.text}")
+                    # Error lainnya - log dan coba mode berikutnya sebagai fallback
+                    last_error = resp_data.get("description", resp.text)
+                    logger.warning(f"Telegram failed with {parse_mode or 'plain'} mode: {last_error}")
+                    if parse_mode == parse_modes[-1][0]:  # Sudah mode terakhir
+                        return False
+                    continue
             except Exception as e:
-                logger.error(f"Telegram error: {e}")
-            time.sleep(2 ** attempt)  # exponential backoff
+                last_error = str(e)
+                logger.error(f"Telegram error with {parse_mode or 'plain'} mode: {e}")
+                if parse_mode == parse_modes[-1][0]:  # Sudah mode terakhir
+                    return False
+                continue
+        
+        logger.error(f"Failed to send Telegram message with all parse modes. Last error: {last_error}")
         return False
+    
+    def _escape_html(self, text):
+        """Escape text untuk Telegram HTML mode"""
+        if not isinstance(text, str):
+            text = str(text)
+        # HTML mode hanya perlu escape: < > &
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     def format_alert(self, event):
+        """
+        Format alert message. Jangan escape manual di sini,
+        biarkan sanitize_for_telegram yang menangani escaping.
+        """
         if event["type"] == "ip_alert":
             msg = (
-                f"\\[ALERT\\] Brute\\-like access detected\n"
-                f"IP: {event['ip']}\n"
-                f"Hits: {event['hits']} dalam {self.config['window_seconds']}s\n"
-                f"Contoh path: {event['example_path']}\n"
-                f"Time: {event['timestamp']}"
+                f"🔴 [ALERT] Brute-like access detected\n"
+                f"📍 IP: {event.get('ip', 'N/A')}\n"
+                f"🔢 Hits: {event.get('hits', 0)} dalam {self.config.get('window_seconds', 60)}s\n"
+                f"📂 Path: {event.get('example_path', 'N/A')}\n"
+                f"⏰ Time: {event.get('timestamp', 'N/A')}"
             )
             return msg
         elif event["type"] == "fs_alert":
             msg = (
-                f"\\[FS ALERT\\] File berbahaya terdeteksi\n"
-                f"Event: {event['event']}\n"
-                f"Path: {event['path']}\n"
-                f"Size: {event['size']} bytes\n"
-                f"Time: {event['timestamp']}"
+                f"⚠️ [FS ALERT] File berbahaya terdeteksi\n"
+                f"📝 Event: {event.get('event', 'N/A')}\n"
+                f"📂 Path: {event.get('path', 'N/A')}\n"
+                f"📊 Size: {event.get('size', 0)} bytes\n"
+                f"⏰ Time: {event.get('timestamp', 'N/A')}"
             )
             return msg
         return None

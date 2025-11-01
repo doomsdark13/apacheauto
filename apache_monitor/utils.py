@@ -15,9 +15,22 @@ def sha256sum(filepath):
     return hash_sha256.hexdigest()
 
 def sanitize_for_telegram(text):
-    # Escape characters that break Telegram MarkdownV2
-    for c in "_*[]()~`>#+-=|{}.!":
-        text = text.replace(c, "\\" + c)
+    """
+    Escape characters yang reserved di Telegram MarkdownV2.
+    Menurut dokumentasi Telegram, karakter yang perlu di-escape:
+    _ * [ ] ( ) ~ ` > # + - = | { } . !
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    
+    # Urutan penting: escape backslash dulu untuk menghindari double escape
+    text = text.replace("\\", "\\\\")
+    
+    # Kemudian escape karakter reserved lainnya
+    reserved_chars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+    for char in reserved_chars:
+        text = text.replace(char, "\\" + char)
+    
     return text
 
 def now_str():
