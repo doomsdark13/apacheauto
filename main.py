@@ -75,25 +75,39 @@ def main():
             
             def run_telegram_bot():
                 try:
+                    print("\n[MAIN] Starting Telegram bot polling thread...")
                     logger.info("Starting Telegram bot polling...")
+                    print("[TELEGRAM BOT] Bot polling started - waiting for updates...")
+                    # Jangan drop pending updates, biarkan semua update diproses
                     telegram_app.run_polling(
                         allowed_updates=["message", "callback_query"],
-                        drop_pending_updates=True
+                        drop_pending_updates=False,  # Ubah ke False untuk menerima semua update
+                        close_loop=False
                     )
+                except KeyboardInterrupt:
+                    print("[TELEGRAM BOT] Polling stopped by user")
+                    logger.info("Telegram bot polling stopped")
                 except Exception as e:
+                    print(f"[TELEGRAM BOT] ❌ POLLING ERROR: {e}")
+                    print(f"[TELEGRAM BOT] Error type: {type(e).__name__}")
                     logger.error(f"Error in Telegram bot polling: {e}", exc_info=True)
             
             tg_thread = threading.Thread(target=run_telegram_bot, daemon=True, name="TelegramBot")
             tg_thread.start()
             
             # Beri waktu untuk bot mulai
-            time.sleep(2)
+            print("[MAIN] Waiting for Telegram bot to initialize...")
+            time.sleep(3)
             
             if tg_thread.is_alive():
+                print("[MAIN] ✅ Telegram bot thread is running")
                 logger.info("✅ Telegram bot listener started successfully for /test_scan")
             else:
+                print("[MAIN] ⚠️ WARNING: Telegram bot thread tidak berjalan!")
                 logger.warning("⚠️ Telegram bot thread tidak berjalan")
         else:
+            print("[MAIN] ⚠️ WARNING: Telegram bot tidak diinisialisasi!")
+            print("[MAIN] Check .env file for TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
             logger.warning("Telegram bot tidak diinisialisasi (token atau chat_id tidak ada)")
 
         # Start monitors dengan error handling terpisah

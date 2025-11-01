@@ -230,17 +230,34 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             print(f"[TELEGRAM BOT] ❌ CRITICAL: Failed to send error message: {e}")
             logger.error(f"Failed to send error message: {e}")
 
+async def any_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk semua message yang bukan command (untuk debugging)"""
+    if update.message and not update.message.text.startswith('/'):
+        print(f"[TELEGRAM BOT] Received non-command message: {update.message.text}")
+        logger.debug(f"Non-command message: {update.message.text}")
+
 def start_bot():
     """Inisialisasi dan start Telegram bot"""
     print("\n" + "="*60)
     print("[TELEGRAM BOT] Checking configuration...")
     print("="*60)
     
+    # Debug: print environment variables
+    import os
+    token_from_env = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id_from_env = os.getenv("TELEGRAM_CHAT_ID")
+    
+    print(f"[DEBUG] TELEGRAM_BOT_TOKEN from env: {'SET' if token_from_env else 'NOT SET'}")
+    print(f"[DEBUG] TELEGRAM_CHAT_ID from env: {'SET' if chat_id_from_env else 'NOT SET'}")
+    
     if not TELEGRAM_BOT_TOKEN or not AUTHORIZED_CHAT_ID:
         print("[TELEGRAM BOT] ❌ CONFIGURATION ERROR:")
         print(f"  TELEGRAM_BOT_TOKEN: {'✅ SET' if TELEGRAM_BOT_TOKEN else '❌ NOT SET'}")
         print(f"  TELEGRAM_CHAT_ID: {'✅ SET' if AUTHORIZED_CHAT_ID else '❌ NOT SET'}")
         print("[TELEGRAM BOT] Bot tidak dapat diinisialisasi tanpa token dan chat_id!")
+        print("[TELEGRAM BOT] Pastikan .env file berisi:")
+        print("[TELEGRAM BOT]   TELEGRAM_BOT_TOKEN=your_token")
+        print("[TELEGRAM BOT]   TELEGRAM_CHAT_ID=your_chat_id")
         logger.warning("TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID tidak ditemukan")
         logger.warning(f"TELEGRAM_BOT_TOKEN: {'SET' if TELEGRAM_BOT_TOKEN else 'NOT SET'}")
         logger.warning(f"TELEGRAM_CHAT_ID: {'SET' if AUTHORIZED_CHAT_ID else 'NOT SET'}")
@@ -259,20 +276,27 @@ def start_bot():
         # Add error handler
         app.add_error_handler(error_handler)
         
-        # Add command handlers
+        # Add command handlers (prioritas tinggi)
         app.add_handler(CommandHandler("start", start_command))
         app.add_handler(CommandHandler("test_scan", test_scan))
         app.add_handler(CommandHandler("test", test_command))
         
+        # Add message handler untuk debugging (prioritas rendah)
+        from telegram.ext import MessageHandler, filters
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, any_message_handler), group=1)
+        
         print("[TELEGRAM BOT] ✅ Bot initialized successfully!")
         print(f"[TELEGRAM BOT] Commands registered: /start, /test_scan, /test")
         print(f"[TELEGRAM BOT] Authorized chat_id: {AUTHORIZED_CHAT_ID}")
+        print(f"[TELEGRAM BOT] Bot token: {TELEGRAM_BOT_TOKEN[:20]}...{TELEGRAM_BOT_TOKEN[-10:]}")
         print("="*60 + "\n")
         logger.info(f"Telegram bot initialized successfully for chat_id: {AUTHORIZED_CHAT_ID}")
         return app
     except Exception as e:
         print(f"[TELEGRAM BOT] ❌ INITIALIZATION ERROR: {e}")
         print(f"[TELEGRAM BOT] Error type: {type(e).__name__}")
+        import traceback
+        print(f"[TELEGRAM BOT] Traceback:\n{traceback.format_exc()}")
         print("="*60 + "\n")
         logger.error(f"Failed to initialize Telegram bot: {e}", exc_info=True)
         return None
