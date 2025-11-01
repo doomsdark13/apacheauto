@@ -1,0 +1,27 @@
+[Unit]
+Description=ApacheAuto Monitor Service
+After=network.target apache2.service
+Requires=apache2.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/apacheauto
+ExecStart=/usr/bin/python3 /opt/apacheauto/main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment="PATH=/usr/bin:/usr/sbin:/bin:/sbin"
+Environment="PYTHONUNBUFFERED=1"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

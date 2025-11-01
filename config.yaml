@@ -1,0 +1,22 @@
+# File konfigurasi utama
+
+target_log_path: "/var/log/apache2/access.log"
+target_dir: "/var/www/html/public"
+
+threshold: 15
+window_seconds: 60
+alert_cooldown: 3600
+
+suspicious_extensions:
+  - ".php"
+  - ".phar"
+
+log_format: "combined" # atau 'common'
+log_encoding: "utf-8"
+follow_symlinks: false
+
+# Opsional: pola tambahan (regex) untuk deteksi berbahaya
+dangerous_patterns:
+  - "/\\.env"
+  - "/wp-admin/"
+  - "/upload/.*\\.php$"
